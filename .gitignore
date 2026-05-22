@@ -1,0 +1,29 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.matplotlib-cache/
+
+# Certificate data can contain personal information. Keep datasets local.
+dataset/real/*
+!dataset/real/.gitkeep
+dataset/fake/*
+!dataset/fake/.gitkeep
+dataset/dataset_log.csv
+
+# Generated ELA images and trained models are reproducible artifacts.
+ela_images/real/*
+!ela_images/real/.gitkeep
+ela_images/fake/*
+!ela_images/fake/.gitkeep
+model/*
+!model/.gitkeep
+docs/training_metrics.json
+docs/confusion_matrix.csv
+docs/validation_predictions.csv
+
+uploads/
+*.keras
+*.h5
+*.log
