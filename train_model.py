@@ -4,11 +4,13 @@ import argparse
 import csv
 import json
 import os
+import random
 from pathlib import Path
 
 
-IMAGE_SIZE = (128, 128)
+IMAGE_SIZE = (224, 224)
 CLASS_NAMES = ["real", "fake"]
+CLASS_TO_LABEL = {"real": 0, "fake": 1}
 DEFAULT_MODEL_PATH = Path("model") / "certificate_cnn.keras"
 DEFAULT_METRICS_PATH = Path("docs") / "training_metrics.json"
 DEFAULT_PREDICTIONS_PATH = Path("docs") / "validation_predictions.csv"
@@ -31,73 +33,105 @@ def require_tensorflow():
     return tf
 
 
-def build_cnn_model(tf, image_size: tuple[int, int] = IMAGE_SIZE):
-    model = tf.keras.Sequential(
+def build_data_augmentation(tf):
+    return tf.keras.Sequential(
         [
-            tf.keras.layers.Input(shape=(image_size[0], image_size[1], 3)),
-            tf.keras.layers.Rescaling(1.0 / 255),
-            tf.keras.layers.Conv2D(32, (3, 3), activation="relu"),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Conv2D(64, (3, 3), activation="relu"),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Conv2D(128, (3, 3), activation="relu"),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(128, activation="relu"),
-            tf.keras.layers.Dropout(0.5),
-            tf.keras.layers.Dense(1, activation="sigmoid"),
-        ]
+            tf.keras.layers.RandomFlip("horizontal"),
+            tf.keras.layers.RandomRotation(0.05),
+            tf.keras.layers.RandomZoom(0.1),
+            tf.keras.layers.RandomTranslation(0.05, 0.05),
+            tf.keras.layers.RandomBrightness(0.1),
+            tf.keras.layers.RandomContrast(0.1),
+        ],
+        name="data_augmentation",
     )
 
+
+def build_cnn_model(tf, image_size: tuple[int, int] = IMAGE_SIZE):
+    base_model = tf.keras.applications.EfficientNetB0(
+        weights="imagenet",
+        include_top=False,
+        input_shape=(image_size[0], image_size[1], 3),
+    )
+    base_model.trainable = False
+
+    inputs = tf.keras.layers.Input(shape=(image_size[0], image_size[1], 3))
+    x = build_data_augmentation(tf)(inputs)
+    x = base_model(x, training=False)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(128, activation="relu")(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Dropout(0.4)(x)
+    outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+
+    model = tf.keras.Model(inputs, outputs)
     model.compile(
-        optimizer="adam",
-        loss="binary_crossentropy",
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=0.05),
         metrics=[
             "accuracy",
             tf.keras.metrics.Precision(name="precision"),
             tf.keras.metrics.Recall(name="recall"),
         ],
     )
-    return model
+    return model, base_model
+
+
+def _create_dataset_from_paths(tf, image_paths: list[str], labels: list[int], image_size: tuple[int, int], batch_size: int, shuffle: bool = False, shuffle_seed: int | None = None):
+    path_ds = tf.data.Dataset.from_tensor_slices((image_paths, labels))
+
+    if shuffle and shuffle_seed is not None:
+        path_ds = path_ds.shuffle(buffer_size=len(image_paths), seed=shuffle_seed, reshuffle_each_iteration=True)
+
+    def load_and_preprocess(path, label):
+        img = tf.io.read_file(path)
+        img = tf.image.decode_jpeg(img, channels=3)
+        img = tf.image.resize(img, [image_size[0], image_size[1]])
+        return img, label
+
+    ds = path_ds.map(load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+    return ds
 
 
 def load_datasets(tf, data_dir: str | Path, batch_size: int, validation_split: float, seed: int):
     data_dir = Path(data_dir)
-    if not (data_dir / "real").exists() or not (data_dir / "fake").exists():
+    real_dir = data_dir / "real"
+    fake_dir = data_dir / "fake"
+
+    if not real_dir.exists() or not fake_dir.exists():
         raise SystemExit("Expected ela_images/real and ela_images/fake folders before training.")
 
-    train_ds = tf.keras.utils.image_dataset_from_directory(
-        data_dir,
-        labels="inferred",
-        label_mode="binary",
-        class_names=CLASS_NAMES,
-        validation_split=validation_split,
-        subset="training",
-        seed=seed,
-        shuffle=True,
-        image_size=IMAGE_SIZE,
-        batch_size=batch_size,
-    )
-    validation_ds = tf.keras.utils.image_dataset_from_directory(
-        data_dir,
-        labels="inferred",
-        label_mode="binary",
-        class_names=CLASS_NAMES,
-        validation_split=validation_split,
-        subset="validation",
-        seed=seed,
-        shuffle=True,
-        image_size=IMAGE_SIZE,
-        batch_size=batch_size,
-    )
-    validation_file_paths = list(getattr(validation_ds, "file_paths", []))
+    real_files = sorted(str(p) for p in real_dir.glob("*.jpg"))
+    fake_files = sorted(str(p) for p in fake_dir.glob("*.jpg"))
 
-    autotune = tf.data.AUTOTUNE
-    return (
-        train_ds.cache().shuffle(500, seed=seed).prefetch(buffer_size=autotune),
-        validation_ds.cache().prefetch(buffer_size=autotune),
-        validation_file_paths,
-    )
+    if not real_files or not fake_files:
+        raise SystemExit("No JPEG images found in ela_images/real or ela_images/fake.")
+
+    rng = random.Random(seed)
+    rng.shuffle(real_files)
+    rng.shuffle(fake_files)
+
+    val_count_real = max(1, int(len(real_files) * validation_split))
+    val_count_fake = max(1, int(len(fake_files) * validation_split))
+
+    train_paths = real_files[val_count_real:] + fake_files[val_count_fake:]
+    train_labels = [0] * (len(real_files) - val_count_real) + [1] * (len(fake_files) - val_count_fake)
+
+    val_paths = real_files[:val_count_real] + fake_files[:val_count_fake]
+    val_labels = [0] * val_count_real + [1] * val_count_fake
+
+    # Shuffle training pairs
+    train_pairs = list(zip(train_paths, train_labels))
+    rng.shuffle(train_pairs)
+    train_paths = [p for p, _ in train_pairs]
+    train_labels = [l for _, l in train_pairs]
+
+    train_ds = _create_dataset_from_paths(tf, train_paths, train_labels, IMAGE_SIZE, batch_size, shuffle=True, shuffle_seed=seed)
+    val_ds = _create_dataset_from_paths(tf, val_paths, val_labels, IMAGE_SIZE, batch_size, shuffle=False)
+
+    return train_ds, val_ds, val_paths
 
 
 def collect_validation_predictions(model, validation_ds) -> tuple[list[int], list[float]]:
@@ -246,28 +280,76 @@ def print_evaluation_report(
 def run_training(
     data_dir: str | Path = "ela_images",
     model_path: str | Path = DEFAULT_MODEL_PATH,
-    epochs: int = 10,
-    batch_size: int = 16,
+    epochs: int = 25,
+    batch_size: int = 32,
     validation_split: float = 0.2,
     seed: int = 1337,
     threshold: float = 0.5,
     metrics_output: str | Path | None = DEFAULT_METRICS_PATH,
     predictions_output: str | Path | None = DEFAULT_PREDICTIONS_PATH,
     confusion_matrix_output: str | Path | None = DEFAULT_CONFUSION_MATRIX_PATH,
+    fine_tune_epochs: int = 15,
 ):
     tf = require_tensorflow()
     train_ds, validation_ds, validation_paths = load_datasets(tf, data_dir, batch_size, validation_split, seed)
-    model = build_cnn_model(tf)
+
+    print(f"Training samples: {sum(1 for _ in train_ds.unbatch())}")
+    print(f"Validation samples: {sum(1 for _ in validation_ds.unbatch())}")
+
+    model, base_model = build_cnn_model(tf)
 
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
             monitor="val_loss",
-            patience=3,
+            patience=5,
             restore_best_weights=True,
-        )
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6
+        ),
     ]
 
-    history = model.fit(train_ds, validation_data=validation_ds, epochs=epochs, callbacks=callbacks)
+    print("Phase 1: Training top classifier with frozen backbone...")
+    history = model.fit(
+        train_ds,
+        validation_data=validation_ds,
+        epochs=epochs,
+        callbacks=callbacks,
+    )
+
+    print("Phase 2: Fine-tuning backbone...")
+    base_model.trainable = True
+    for layer in base_model.layers[:-30]:
+        layer.trainable = False
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=0.05),
+        metrics=[
+            "accuracy",
+            tf.keras.metrics.Precision(name="precision"),
+            tf.keras.metrics.Recall(name="recall"),
+        ],
+    )
+
+    fine_tune_callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=5,
+            restore_best_weights=True,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5, patience=3, min_lr=1e-7
+        ),
+    ]
+
+    history_fine = model.fit(
+        train_ds,
+        validation_data=validation_ds,
+        epochs=fine_tune_epochs,
+        callbacks=fine_tune_callbacks,
+    )
+
     metrics = print_evaluation_report(
         model,
         validation_ds,
@@ -282,15 +364,21 @@ def run_training(
     model_path.parent.mkdir(parents=True, exist_ok=True)
     model.save(model_path)
     print(f"Saved model to {model_path}")
-    return {"history": history.history, "metrics": metrics, "model_path": str(model_path)}
+    return {
+        "history": history.history,
+        "history_fine": history_fine.history,
+        "metrics": metrics,
+        "model_path": str(model_path),
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train the certificate ELA CNN classifier.")
+    parser.add_argument("--cert-type", choices=["internship", "medical"], default=None, help="Type of certificate to train for.")
     parser.add_argument("--data", default="ela_images", help="ELA image dataset root.")
     parser.add_argument("--model", default=str(DEFAULT_MODEL_PATH), help="Output model path.")
-    parser.add_argument("--epochs", type=int, default=10, help="Training epochs.")
-    parser.add_argument("--batch-size", type=int, default=16, help="Training batch size.")
+    parser.add_argument("--epochs", type=int, default=25, help="Training epochs for frozen backbone.")
+    parser.add_argument("--batch-size", type=int, default=32, help="Training batch size.")
     parser.add_argument("--validation-split", type=float, default=0.2, help="Fraction of images used for validation.")
     parser.add_argument("--seed", type=int, default=1337, help="Random seed.")
     parser.add_argument("--threshold", type=float, default=0.5, help="Fake probability threshold for validation metrics.")
@@ -305,22 +393,44 @@ def build_parser() -> argparse.ArgumentParser:
         default=str(DEFAULT_CONFUSION_MATRIX_PATH),
         help="CSV confusion matrix output path.",
     )
+    parser.add_argument("--fine-tune-epochs", type=int, default=10, help="Epochs for fine-tuning the backbone.")
     return parser
 
 
 def main(argv: list[str] | None = None):
     args = build_parser().parse_args(argv)
+    
+    cert_type = args.cert_type
+    data_dir = args.data
+    model_path = args.model
+    metrics_output = args.metrics_output
+    predictions_output = args.predictions_output
+    confusion_matrix_output = args.confusion_matrix_output
+
+    if cert_type:
+        if data_dir == "ela_images":
+            data_dir = f"ela_images_{cert_type}"
+        if model_path == str(DEFAULT_MODEL_PATH):
+            model_path = f"model/{cert_type}_cnn.keras"
+        if metrics_output == str(DEFAULT_METRICS_PATH):
+            metrics_output = f"docs/{cert_type}_training_metrics.json"
+        if predictions_output == str(DEFAULT_PREDICTIONS_PATH):
+            predictions_output = f"docs/{cert_type}_validation_predictions.csv"
+        if confusion_matrix_output == str(DEFAULT_CONFUSION_MATRIX_PATH):
+            confusion_matrix_output = f"docs/{cert_type}_confusion_matrix.csv"
+
     return run_training(
-        data_dir=args.data,
-        model_path=args.model,
+        data_dir=data_dir,
+        model_path=model_path,
         epochs=args.epochs,
         batch_size=args.batch_size,
         validation_split=args.validation_split,
         seed=args.seed,
         threshold=args.threshold,
-        metrics_output=args.metrics_output,
-        predictions_output=args.predictions_output,
-        confusion_matrix_output=args.confusion_matrix_output,
+        metrics_output=metrics_output,
+        predictions_output=predictions_output,
+        confusion_matrix_output=confusion_matrix_output,
+        fine_tune_epochs=args.fine_tune_epochs,
     )
 
 

@@ -1,0 +1,134 @@
+{
+  "internship": {
+    "real": [
+      {
+        "file": "internship_real_0001.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 92.0,
+        "fake_prob": 8.0
+      },
+      {
+        "file": "internship_real_0002.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 98.8,
+        "fake_prob": 1.2
+      },
+      {
+        "file": "internship_real_0003.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 98.1,
+        "fake_prob": 1.9
+      },
+      {
+        "file": "internship_real_0004.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 96.3,
+        "fake_prob": 3.7
+      },
+      {
+        "file": "internship_real_0005.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 91.6,
+        "fake_prob": 8.4
+      }
+    ],
+    "fake": [
+      {
+        "file": "internship_fake_0001.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 99.8,
+        "fake_prob": 99.8
+      },
+      {
+        "file": "internship_fake_0002.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 98.8,
+        "fake_prob": 98.8
+      },
+      {
+        "file": "internship_fake_0003.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 90.3,
+        "fake_prob": 90.3
+      },
+      {
+        "file": "internship_fake_0004.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 92.9,
+        "fake_prob": 92.9
+      },
+      {
+        "file": "internship_fake_0005.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 81.7,
+        "fake_prob": 81.7
+      }
+    ]
+  },
+  "medical": {
+    "real": [
+      {
+        "file": "medical_real_0001.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 85.5,
+        "fake_prob": 14.5
+      },
+      {
+        "file": "medical_real_0002.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 97.3,
+        "fake_prob": 2.7
+      },
+      {
+        "file": "medical_real_0003.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 96.9,
+        "fake_prob": 3.1
+      },
+      {
+        "file": "medical_real_0004.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 98.0,
+        "fake_prob": 2.0
+      },
+      {
+        "file": "medical_real_0005.jpg",
+        "predicted": "Real Certificate",
+        "confidence": 94.9,
+        "fake_prob": 5.1
+      }
+    ],
+    "fake": [
+      {
+        "file": "medical_fake_0001.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 86.0,
+        "fake_prob": 86.0
+      },
+      {
+        "file": "medical_fake_0002.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 86.2,
+        "fake_prob": 86.2
+      },
+      {
+        "file": "medical_fake_0003.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 88.8,
+        "fake_prob": 88.8
+      },
+      {
+        "file": "medical_fake_0004.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 89.5,
+        "fake_prob": 89.5
+      },
+      {
+        "file": "medical_fake_0005.jpg",
+        "predicted": "Fake Certificate",
+        "confidence": 88.4,
+        "fake_prob": 88.4
+      }
+    ]
+  }
+}

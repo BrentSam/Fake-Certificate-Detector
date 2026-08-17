@@ -1,6 +1,6 @@
-# Fake Internship Certificate Detector
+# Fake Certificate Detector
 
-A beginner-friendly Python prototype that detects fake internship certificates using **Error Level Analysis (ELA)** and a **Convolutional Neural Network (CNN)**.
+A Python-based tool that detects fake **internship** and **medical** certificates using **Error Level Analysis (ELA)** and a **Convolutional Neural Network (CNN)** built on EfficientNetB0.
 
 > **What it does:** This tool analyzes certificate images to flag potential visual tampering. It is a first-pass screening tool and cannot prove absolute authenticity without verification from the issuing organization.
 
@@ -9,9 +9,12 @@ A beginner-friendly Python prototype that detects fake internship certificates u
 ## Table of Contents
 
 - [What You Need](#what-you-need)
-- [Quick Start (5 Steps)](#quick-start-5-steps)
+- [Quick Start](#quick-start)
+- [Certificate Types](#certificate-types)
 - [Project Structure](#project-structure)
 - [Detailed Usage](#detailed-usage)
+- [Web Interface](#web-interface)
+- [Model Performance](#model-performance)
 - [Running Tests](#running-tests)
 - [Important Notes](#important-notes)
 
@@ -19,82 +22,108 @@ A beginner-friendly Python prototype that detects fake internship certificates u
 
 ## What You Need
 
-- **Python 3.8 or higher**
-- **pip** (Python package installer)
+- **Python 3.13 or higher**
+- **uv** (Python package and project manager)
 - A terminal (PowerShell, Command Prompt, or any shell)
 
-All dependencies are listed in `requirements.txt` and will be installed automatically.
+All dependencies are declared in `pyproject.toml` and will be installed automatically by `uv`.
 
 ---
 
-## Quick Start (5 Steps)
-
-Follow these commands in order to get the detector running.
+## Quick Start
 
 ### Step 1: Install Dependencies
 
-Create a virtual environment and install required packages:
-
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
+uv sync
 ```
 
-> On macOS/Linux, use: `source .venv/bin/activate` instead of `.\.venv\Scripts\activate`.
-
-### Step 2: Prepare Dataset Images
-
-Generate a privacy-safe synthetic starter dataset to test the pipeline:
+Then run any command with `uv run`:
 
 ```powershell
-python main.py sample-data --count 50
+uv run python main.py --help
 ```
 
-This creates:
-- `dataset/real/` - 50 synthetic real certificate images
-- `dataset/fake/` - 50 synthetic fake certificate images
-- `docs/synthetic_dataset_log.csv` - a log of generated data
+> On macOS/Linux, you can alternatively activate the environment with: `source .venv/bin/activate`.
 
-**Want to use your own images?** Simply place your certificate images into:
-- `dataset/real/` for genuine certificates
-- `dataset/fake/` for known fake/forged certificates
+### Step 2: Generate Synthetic Dataset
+
+Generate privacy-safe synthetic certificates for training. Use `--cert-type` to choose between **internship** and **medical** certificates:
+
+```powershell
+# Generate 500 internship certificates (250 real + 250 fake)
+uv run python main.py sample-data --cert-type internship --count 500
+
+# Generate 500 medical certificates (250 real + 250 fake)
+uv run python main.py sample-data --cert-type medical --count 500
+```
+
+Output directories:
+- `dataset_internship/real/` and `dataset_internship/fake/`
+- `dataset_medical/real/` and `dataset_medical/fake/`
+
+**Want to use your own images?** Place certificate images into the appropriate `real/` and `fake/` subdirectories.
 
 ### Step 3: Convert to ELA Images
 
-Transform the dataset into Error Level Analysis (ELA) images. ELA highlights areas of an image that may have been digitally altered:
+Transform the dataset into Error Level Analysis images. ELA highlights areas that may have been digitally altered:
 
 ```powershell
-python main.py ela --input dataset --output ela_images --size 128
+# Convert internship certificates
+uv run python main.py ela --cert-type internship
+
+# Convert medical certificates
+uv run python main.py ela --cert-type medical
 ```
 
-This creates:
-- `ela_images/real/` - ELA versions of real certificates
-- `ela_images/fake/` - ELA versions of fake certificates
+Output directories:
+- `ela_images_internship/real/` and `ela_images_internship/fake/`
+- `ela_images_medical/real/` and `ela_images_medical/fake/`
 
-### Step 4: Train the Model
+### Step 4: Train the Models
 
-Train the CNN on the ELA images:
+Train a separate CNN model for each certificate type:
 
 ```powershell
-python main.py train --data ela_images --epochs 10
+# Train internship model
+uv run python main.py train --cert-type internship --epochs 25 --fine-tune-epochs 15
+
+# Train medical model
+uv run python main.py train --cert-type medical --epochs 25 --fine-tune-epochs 15
 ```
 
-This saves several files:
-- `model/certificate_cnn.keras` - the trained neural network model
-- `docs/training_metrics.json` - accuracy, precision, recall, and F1-score
-- `docs/confusion_matrix.csv` - model performance breakdown
-- `docs/validation_predictions.csv` - predictions on validation data
+This saves:
+- `model/internship_cnn.keras` and `model/medical_cnn.keras` — trained models
+- `docs/<type>_training_metrics.json` — accuracy, precision, recall, F1-score
+- `docs/<type>_confusion_matrix.csv` — performance breakdown
+- `docs/<type>_validation_predictions.csv` — individual validation predictions
 
 ### Step 5: Predict (Detect Fake Certificates)
 
 Classify a single certificate image:
 
 ```powershell
-python main.py predict "path\to\certificate.jpg"
+# Predict an internship certificate
+uv run python main.py predict "path\to\certificate.jpg" --cert-type internship
+
+# Predict a medical certificate
+uv run python main.py predict "path\to\certificate.jpg" --cert-type medical
 ```
 
-The script will output whether the certificate is predicted as **Real** or **Fake**, along with a confidence score.
+The output shows whether the certificate is predicted as **Real** or **Fake**, along with a confidence score.
+
+---
+
+## Certificate Types
+
+The system supports two certificate types, each with its own dedicated model:
+
+| Type | Dataset Directory | ELA Directory | Model File |
+|------|------------------|---------------|------------|
+| **Internship** | `dataset_internship/` | `ela_images_internship/` | `model/internship_cnn.keras` |
+| **Medical** | `dataset_medical/` | `ela_images_medical/` | `model/medical_cnn.keras` |
+
+Use `--cert-type internship` or `--cert-type medical` with any command to target the specific type.
 
 ---
 
@@ -102,68 +131,72 @@ The script will output whether the certificate is predicted as **Real** or **Fak
 
 ```text
 Fake Certificate Detector/
-|-- dataset/                    # Your certificate images
-|   |-- real/
-|   `-- fake/
-|-- ela_images/                 # Preprocessed ELA images
-|   |-- real/
-|   `-- fake/
-|-- model/                      # Trained model files
-|-- app/                        # Web application
-|   |-- templates/
-|   `-- web_app.py
-|-- docs/                       # Documentation and logs
-|-- tests/                      # Unit tests
-|-- generate_synthetic_dataset.py
-|-- ela_converter.py
-|-- train_model.py
-|-- predict.py
-|-- main.py                     # Main entry point (CLI)
-`-- requirements.txt
+├── app/                             # Web application
+│   ├── templates/                   # HTML templates (login, signup, dashboard, etc.)
+│   ├── auth.py                      # Authentication (login/signup with SQLite)
+│   └── web_app.py                   # Flask app with blueprints
+├── dataset_internship/              # Internship certificate images
+│   ├── real/
+│   └── fake/
+├── dataset_medical/                 # Medical certificate images
+│   ├── real/
+│   └── fake/
+├── ela_images_internship/           # Preprocessed ELA images (internship)
+│   ├── real/
+│   └── fake/
+├── ela_images_medical/              # Preprocessed ELA images (medical)
+│   ├── real/
+│   └── fake/
+├── model/                           # Trained model files
+│   ├── internship_cnn.keras
+│   └── medical_cnn.keras
+├── demo_certificates/               # Demo certificates for presentation
+├── docs/                            # Documentation, metrics, and logs
+├── tests/                           # Unit tests
+├── memory-bank/                     # Project working context
+├── generate_synthetic_dataset.py    # Internship certificate generator
+├── generate_medical_certificates.py # Medical certificate generator
+├── ela_converter.py                 # ELA image converter
+├── train_model.py                   # CNN model architecture and training
+├── predict.py                       # Single image prediction
+├── main.py                          # Main entry point (CLI)
+├── run_demo_predictions.py          # Demo prediction script
+├── pyproject.toml                   # Project dependencies and metadata
+└── uv.lock                         # Lockfile created by uv
 ```
 
 ---
 
 ## Detailed Usage
 
-### Using the Web Interface
+### Web Interface
 
-For a drag-and-drop upload interface, run the Flask web server:
+The project includes a full web application with authentication and drag-and-drop certificate validation:
 
 ```powershell
-python main.py web
+uv run app.py
 ```
 
-Then open your browser and go to:
+Then open your browser to: **http://127.0.0.1:5000**
 
-```
-http://127.0.0.1:5000
-```
+**Features:**
+- User registration and login (SQLite-backed authentication)
+- Certificate type selection (internship or medical)
+- Drag-and-drop image upload
+- Real-time ELA analysis and prediction display
+- Confidence scores and result visualization
 
-Upload a certificate image, and the web UI will show the prediction result.
+### Running Demo Predictions
 
-### Running Individual Scripts
+To showcase the system's accuracy with sample certificates:
 
-Instead of using `main.py`, you can run each step directly:
-
-**Generate synthetic data:**
 ```powershell
-python generate_synthetic_dataset.py --count 50
-```
+# 1. Generate demo certificates
+uv run python main.py sample-data --cert-type internship --count 5 --output demo_certificates/internship --overwrite
+uv run python main.py sample-data --cert-type medical --count 5 --output demo_certificates/medical --overwrite
 
-**Convert to ELA:**
-```powershell
-python ela_converter.py --input dataset --output ela_images --size 128
-```
-
-**Train model:**
-```powershell
-python train_model.py --data ela_images --epochs 10
-```
-
-**Predict:**
-```powershell
-python predict.py "path\to\certificate.jpg"
+# 2. Run predictions and see the summary
+uv run python run_demo_predictions.py
 ```
 
 ### Command Line Help
@@ -171,10 +204,35 @@ python predict.py "path\to\certificate.jpg"
 For help on any command, use `--help`:
 
 ```powershell
-python main.py --help
-python main.py train --help
-python main.py predict --help
+uv run python main.py --help
+uv run python main.py sample-data --help
+uv run python main.py train --help
+uv run python main.py predict --help
 ```
+
+---
+
+## Model Performance
+
+The CNN uses **EfficientNetB0** as a backbone with transfer learning. Training uses a two-phase approach:
+
+1. **Phase 1**: Train the top classifier with the backbone frozen (25 epochs)
+2. **Phase 2**: Fine-tune the last 30 backbone layers with a low learning rate (15 epochs)
+
+**Architecture enhancements:**
+- `RandomFlip`, `RandomRotation`, `RandomZoom`, `RandomTranslation`, `RandomBrightness`, `RandomContrast` data augmentation
+- Dense(128) + BatchNormalization hidden layer
+- Label smoothing (0.05) for regularization
+- `ReduceLROnPlateau` learning rate scheduling
+
+### Current Results (500 images per class)
+
+| Model | Accuracy | Precision | Recall | F1-Score |
+|-------|----------|-----------|--------|----------|
+| **Internship** | **98.0%** | 100% | 96% | 0.98 |
+| **Medical** | **98.5%** | 100% | 97% | 0.985 |
+
+Both models achieve **zero false positives** — no real certificates are incorrectly flagged as fake.
 
 ---
 
@@ -183,14 +241,15 @@ python main.py predict --help
 The project includes lightweight tests that do not require TensorFlow to run:
 
 ```powershell
-python -m unittest discover -s tests
+uv run python -m unittest discover -s tests
 ```
 
 These tests verify:
 - ELA image generation works correctly
-- Synthetic dataset generation produces valid output
+- Synthetic dataset generation produces valid output (both internship and medical)
 - Training metrics are calculated properly
-- Web app upload handling functions correctly
+- Web app authentication and upload handling
+- Flask routing and blueprints
 
 ---
 
@@ -203,6 +262,23 @@ These tests verify:
 
 ---
 
+## Troubleshooting
+
+**Issue: `python` command not found**
+- Solution: Make sure Python is installed and added to your system PATH.
+
+**Issue: `pip install` fails**
+- Solution: This project uses `uv`, not `pip`. Run `uv sync` to install dependencies.
+
+**Issue: Training takes too long**
+- Solution: Reduce epochs: `uv run python main.py train --cert-type internship --epochs 10`
+- Or reduce batch size: `uv run python main.py train --cert-type internship --batch-size 4`
+
+**Issue: Web UI does not open**
+- Solution: Manually visit `http://127.0.0.1:5000` in your browser after running `uv run app.py`.
+
+---
+
 ## Documentation
 
 Additional project documents are available in the `docs/` folder:
@@ -212,20 +288,3 @@ Additional project documents are available in the `docs/` folder:
 - `docs/literature_survey_template.md` - Research background
 - `docs/report_outline.md` - Final report and presentation structure
 - `docs/project_log.md` - Implementation and experiment log
-
----
-
-## Troubleshooting
-
-**Issue: `python` command not found**
-- Solution: Make sure Python is installed and added to your system PATH.
-
-**Issue: `pip install` fails**
-- Solution: Make sure your virtual environment is activated (you should see `(.venv)` in your terminal prompt).
-
-**Issue: Training takes too long**
-- Solution: Reduce the number of epochs: `python main.py train --data ela_images --epochs 5`
-- Or reduce batch size if you run out of memory: `python main.py train --data ela_images --epochs 10 --batch-size 4`
-
-**Issue: Web UI does not open**
-- Solution: Manually visit `http://127.0.0.1:5000` in your browser after running `python main.py web`.

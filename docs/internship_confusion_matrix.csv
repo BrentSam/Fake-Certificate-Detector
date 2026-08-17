@@ -1,0 +1,3 @@
+actual\predicted,real,fake
+real,100,0
+fake,4,96

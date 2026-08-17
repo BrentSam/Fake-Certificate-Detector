@@ -1,0 +1,1080 @@
+{% extends "base.html" %}
+{% block title %}Verify {{ cert_type|capitalize }} Certificate - CertiGuard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .validate-stage {
+        display: grid;
+        grid-template-columns: 1.15fr 1fr;
+        gap: 32px;
+        align-items: start;
+    }
+    @media (max-width: 1024px) {
+        .validate-stage { grid-template-columns: 1fr; }
+    }
+
+    .validate-header {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 28px;
+    }
+    .validate-header a.back {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: var(--ink-02);
+        border: 1px solid var(--ink-06);
+        color: var(--ink-60);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.4s var(--ease-soft), color 0.4s var(--ease-soft), transform 0.4s var(--ease-spring);
+    }
+    .validate-header a.back:hover {
+        background: var(--ink-06);
+        color: var(--ink-100);
+        transform: translateX(-3px);
+    }
+    .validate-header a.back svg { width: 16px; height: 16px; }
+
+    .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 12px 5px 6px;
+        background: var(--ink-03);
+        border: 1px solid var(--ink-10);
+        border-radius: var(--radius-pill);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--ink-60);
+        margin-bottom: 12px;
+    }
+    .eyebrow .pip {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .eyebrow .pip svg { width: 11px; height: 11px; }
+    .eyebrow.internship .pip { background: var(--grad-violet); }
+    .eyebrow.medical    .pip { background: var(--grad-emerald); }
+    .eyebrow.internship { color: #c4b5fd; border-color: rgba(167, 139, 250, 0.25); }
+    .eyebrow.medical    { color: #6ee7b7; border-color: rgba(52, 211, 153, 0.25); }
+
+    .validate-title {
+        font-family: var(--font-sans);
+        font-weight: 800;
+        font-size: clamp(28px, 3.4vw, 38px);
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+    }
+    .validate-title .serif {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-weight: 400;
+    }
+    .validate-title.internship .serif { color: var(--accent-violet); }
+    .validate-title.medical    .serif { color: var(--accent-emerald); }
+
+    .panel {
+        position: relative;
+        padding: 1.5px;
+        border-radius: 26px;
+        background: var(--ink-06);
+    }
+    .panel.is-violet  { background: linear-gradient(135deg, rgba(167, 139, 250, 0.30), rgba(255, 255, 255, 0.04)); }
+    .panel.is-emerald { background: linear-gradient(135deg, rgba(52, 211, 153, 0.30), rgba(255, 255, 255, 0.04)); }
+    .panel.is-rose    { background: linear-gradient(135deg, rgba(251, 113, 133, 0.30), rgba(255, 255, 255, 0.04)); }
+    .panel-core {
+        position: relative;
+        padding: 28px;
+        border-radius: 24.5px;
+        background: linear-gradient(180deg, rgba(17, 17, 20, 0.85), rgba(10, 10, 12, 0.92));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    /* Upload Zone */
+    .upload-zone {
+        position: relative;
+        padding: 56px 28px;
+        text-align: center;
+        border: 1.5px dashed var(--ink-10);
+        border-radius: 20px;
+        background: var(--ink-02);
+        cursor: pointer;
+        transition: border-color 0.5s var(--ease-soft), background 0.5s var(--ease-soft), transform 0.5s var(--ease-spring);
+        overflow: hidden;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--ink-20);
+        background: var(--ink-03);
+    }
+    .upload-zone:hover { transform: translateY(-2px); }
+    .upload-zone.internship.dragover { border-color: var(--accent-violet); background: rgba(167, 139, 250, 0.04); }
+    .upload-zone.medical.dragover    { border-color: var(--accent-emerald); background: rgba(52, 211, 153, 0.04); }
+
+    .upload-glyph {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: var(--ink-06);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-60);
+        margin: 0 auto 18px;
+        transition: background 0.5s var(--ease-soft), color 0.5s var(--ease-soft), transform 0.5s var(--ease-spring);
+    }
+    .upload-zone.internship:hover .upload-glyph { background: var(--grad-violet); color: #fff; }
+    .upload-zone.medical:hover    .upload-glyph { background: var(--grad-emerald); color: #052e1a; }
+    .upload-glyph svg { width: 28px; height: 28px; }
+    .upload-zone:hover .upload-glyph { transform: translateY(-3px); }
+
+    .upload-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ink-100);
+        margin-bottom: 6px;
+    }
+    .upload-title b { color: var(--ink-100); font-weight: 700; }
+    .upload-zone.internship .upload-title b { color: var(--accent-violet); }
+    .upload-zone.medical    .upload-title b { color: var(--accent-emerald); }
+    .upload-sub {
+        font-size: 13px;
+        color: var(--ink-40);
+    }
+    .upload-meta {
+        margin-top: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: var(--ink-03);
+        border: 1px solid var(--ink-06);
+        font-size: 11.5px;
+        color: var(--ink-40);
+        font-family: var(--font-mono);
+    }
+    .upload-meta span { display: inline-flex; align-items: center; gap: 5px; }
+    .upload-meta span::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--ink-40); }
+
+    #file-input { display: none; }
+
+    /* Preview */
+    .preview {
+        position: relative;
+        margin-top: 20px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: var(--bg-1);
+        border: 1px solid var(--ink-06);
+        display: none;
+    }
+    .preview img {
+        display: block;
+        width: 100%;
+        max-height: 360px;
+        object-fit: contain;
+    }
+    .preview-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        font-size: 11.5px;
+        color: var(--ink-40);
+        border-top: 1px solid var(--ink-06);
+        background: var(--ink-02);
+    }
+    .preview-meta .name {
+        font-family: var(--font-mono);
+        color: var(--ink-80);
+    }
+    .preview .remove {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(5, 5, 7, 0.8);
+        border: 1px solid var(--ink-10);
+        color: var(--ink-80);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(8px);
+        transition: background 0.4s var(--ease-soft), color 0.4s var(--ease-soft);
+    }
+    .preview .remove:hover { background: var(--accent-rose); color: #fff; border-color: transparent; }
+    .preview .remove svg { width: 12px; height: 12px; }
+
+    /* Run button */
+    .run-btn {
+        width: 100%;
+        margin-top: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px 0 22px;
+        height: 54px;
+        border-radius: 999px;
+        background: var(--ink-100);
+        color: var(--bg-0);
+        font-weight: 700;
+        font-size: 14px;
+        transition: transform 0.4s var(--ease-spring), opacity 0.4s var(--ease-soft);
+    }
+    .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .run-btn .arrow {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--bg-0);
+        color: var(--ink-100);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.5s var(--ease-spring);
+    }
+    .run-btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .run-btn:hover:not(:disabled) .arrow { transform: translate(2px, -2px); }
+    .run-btn svg { width: 14px; height: 14px; }
+    .run-btn.internship { background: var(--grad-violet); color: #fff; }
+    .run-btn.medical    { background: var(--grad-emerald); color: #052e1a; }
+    .run-btn.internship .arrow { background: rgba(255,255,255,0.18); color: #fff; }
+    .run-btn.medical    .arrow { background: rgba(5,46,26,0.20);      color: #052e1a; }
+
+    /* Loading */
+    .loading {
+        display: none;
+        text-align: center;
+        padding: 64px 24px;
+    }
+    .spinner-ring {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+    }
+    .spinner-ring::before,
+    .spinner-ring::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1.5px solid transparent;
+    }
+    .spinner-ring::before { border-top-color: var(--ink-20); border-right-color: var(--ink-10); }
+    .spinner-ring::after  { border-top-color: var(--accent-violet); animation: spin 1.2s linear infinite; }
+    .spinner-ring.alt::after { border-top-color: var(--accent-emerald); }
+    .spinner-ring .core {
+        position: absolute;
+        inset: 18px;
+        border-radius: 50%;
+        background: var(--ink-06);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-60);
+    }
+    .spinner-ring .core svg { width: 22px; height: 22px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading h3 {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--ink-100);
+        margin-bottom: 8px;
+    }
+    .loading p {
+        font-size: 13px;
+        color: var(--ink-40);
+        max-width: 420px;
+        margin: 0 auto;
+        line-height: 1.55;
+    }
+    .loading .steps {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 24px;
+    }
+    .loading .steps .step {
+        width: 32px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--ink-06);
+    }
+    .loading .steps .step.active { background: var(--accent-violet); }
+    .loading .steps .step.active.alt { background: var(--accent-emerald); }
+
+    /* Comparison slider */
+    .compare {
+        position: relative;
+        margin-top: 20px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: var(--bg-1);
+        border: 1px solid var(--ink-06);
+        user-select: none;
+        aspect-ratio: 16 / 10;
+    }
+    .compare .layer {
+        position: absolute;
+        inset: 0;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-color: #060913;
+    }
+    .compare .layer.original { z-index: 1; }
+    .compare .layer.ela      { z-index: 2; clip-path: inset(0 0 0 50%); }
+    .compare .handle {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        background: var(--ink-100);
+        z-index: 3;
+        transform: translateX(-50%);
+        cursor: ew-resize;
+    }
+    .compare .handle::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--ink-100);
+        transform: translate(-50%, -50%);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    }
+    .compare .handle::after {
+        content: '⇄';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: var(--bg-0);
+        font-size: 14px;
+        font-weight: 700;
+        z-index: 4;
+    }
+    .compare .label {
+        position: absolute;
+        top: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(5, 5, 7, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--ink-10);
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--ink-80);
+        z-index: 4;
+    }
+    .compare .label.left  { left: 12px; }
+    .compare .label.right { right: 12px; }
+
+    /* Result Panel */
+    .verdict-card {
+        position: relative;
+        padding: 32px 28px;
+        border-radius: 22px;
+        text-align: center;
+        margin-bottom: 18px;
+    }
+    .verdict-card.real { background: linear-gradient(180deg, rgba(52, 211, 153, 0.06), rgba(5, 150, 105, 0.04)); border: 1px solid rgba(52, 211, 153, 0.18); }
+    .verdict-card.fake { background: linear-gradient(180deg, rgba(251, 113, 133, 0.06), rgba(190, 18, 60, 0.04)); border: 1px solid rgba(251, 113, 133, 0.18); }
+
+    .verdict-mark {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        margin: 0 auto 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .verdict-card.real .verdict-mark { background: var(--grad-emerald); color: #052e1a; box-shadow: 0 0 24px rgba(52, 211, 153, 0.35); }
+    .verdict-card.fake .verdict-mark { background: var(--grad-rose); color: #fff; box-shadow: 0 0 24px rgba(251, 113, 133, 0.35); }
+    .verdict-mark svg { width: 30px; height: 30px; }
+
+    .verdict-eyebrow {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--ink-40);
+        margin-bottom: 8px;
+    }
+    .verdict-title {
+        font-family: var(--font-sans);
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: -0.02em;
+        margin-bottom: 4px;
+    }
+    .verdict-card.real .verdict-title { color: #6ee7b7; }
+    .verdict-card.fake .verdict-title { color: #fda4af; }
+    .verdict-sub { font-size: 13px; color: var(--ink-40); margin-bottom: 22px; }
+
+    .verdict-tech {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px 4px 12px;
+        border-radius: 999px;
+        background: var(--ink-03);
+        border: 1px solid var(--ink-06);
+        margin-bottom: 22px;
+    }
+    .verdict-tech .verdict-tech-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--ink-40);
+        font-weight: 700;
+    }
+    .verdict-tech code {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        color: var(--ink-100);
+        font-weight: 500;
+    }
+    .verdict-card.real .verdict-tech code { color: #6ee7b7; }
+    .verdict-card.fake .verdict-tech code { color: #fda4af; }
+
+    .gauge {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        margin: 0 auto 20px;
+    }
+    .gauge svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+    .gauge circle { fill: none; stroke-width: 6; }
+    .gauge .ring-bg { stroke: var(--ink-06); }
+    .gauge .ring-fg {
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1.6s var(--ease-soft);
+        filter: drop-shadow(0 0 8px currentColor);
+    }
+    .gauge .ring-fg.real { stroke: url(#gauge-emerald); color: var(--accent-emerald); }
+    .gauge .ring-fg.fake { stroke: url(#gauge-rose);    color: var(--accent-rose); }
+    .gauge .value {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .gauge .pct {
+        font-family: var(--font-sans);
+        font-weight: 800;
+        font-size: 32px;
+        letter-spacing: -0.03em;
+        line-height: 1;
+    }
+    .gauge .lbl {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--ink-40);
+        margin-top: 6px;
+    }
+
+    .score-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .score-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-align: left;
+    }
+    .score-row .head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--ink-60);
+    }
+    .score-row .head .v {
+        font-family: var(--font-mono);
+        color: var(--ink-100);
+        font-weight: 600;
+    }
+    .score-row .bar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--ink-06);
+        overflow: hidden;
+        position: relative;
+    }
+    .score-row .bar .fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 1.2s var(--ease-soft);
+    }
+    .score-row.conf .bar .fill { background: var(--grad-emerald); }
+    .score-row.fake .bar .fill  { background: var(--grad-rose); }
+
+    /* Indicator list */
+    .indicators {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .indicator {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 4px;
+        border-top: 1px solid var(--ink-06);
+        font-size: 13px;
+    }
+    .indicator:first-child { border-top: none; }
+    .indicator .left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--ink-60);
+    }
+    .indicator .left .glyph {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--ink-06);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-60);
+    }
+    .indicator .left .glyph svg { width: 14px; height: 14px; }
+    .indicator .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+    .indicator .pill.ok    { background: rgba(52, 211, 153, 0.10); color: var(--accent-emerald); }
+    .indicator .pill.alert { background: rgba(251, 113, 133, 0.10); color: var(--accent-rose); }
+    .indicator .pill .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 6px currentColor;
+    }
+
+    .panel-section-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: var(--ink-40);
+        font-weight: 600;
+    }
+    .panel-section-head .line {
+        flex: 1;
+        height: 1px;
+        background: var(--ink-06);
+    }
+    .panel-section-head svg { width: 13px; height: 13px; color: var(--ink-60); }
+
+    .alert {
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: rgba(251, 113, 133, 0.06);
+        border: 1px solid rgba(251, 113, 133, 0.18);
+        color: #fda4af;
+        font-size: 13px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+    .alert svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    .reset-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: var(--ink-06);
+        color: var(--ink-100);
+        font-size: 12.5px;
+        font-weight: 600;
+        text-decoration: none;
+        margin-top: 18px;
+        transition: background 0.4s var(--ease-soft);
+    }
+    .reset-btn:hover { background: var(--ink-10); }
+    .reset-btn svg { width: 13px; height: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if cert_type == 'internship' %}
+    {% set theme = 'internship' %}
+    {% set accent_class = 'violet' %}
+{% else %}
+    {% set theme = 'medical' %}
+    {% set accent_class = 'emerald' %}
+{% endif %}
+
+<div class="validate-header reveal" data-stagger="0">
+    <a href="/dashboard" class="back" aria-label="Back to dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+        </svg>
+    </a>
+    <div>
+        <span class="eyebrow {{ theme }} reveal" data-stagger="0">
+            <span class="pip">
+                {% if cert_type == 'internship' %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                {% else %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+                {% endif %}
+            </span>
+            <span>{{ theme }} lane</span>
+        </span>
+        <h1 class="validate-title {{ theme }} reveal" data-stagger="1">Verify {{ cert_type|capitalize }} Certificate</h1>
+    </div>
+</div>
+
+<div class="validate-stage">
+    <div class="left-pane">
+        {% if error %}
+        <div class="alert reveal" data-stagger="1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <div class="panel is-{{ accent_class }} reveal" data-stagger="2" data-tilt>
+            <div class="panel-core">
+                <form method="post" enctype="multipart/form-data" id="upload-form">
+                    <div class="upload-zone {{ theme }}" id="drop-zone">
+                        <div class="upload-glyph">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path data-draw d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline data-draw points="17 8 12 3 7 8"/>
+                                <line data-draw x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <div class="upload-title"><b>Click to browse</b> &nbsp;or drag &amp; drop</div>
+                        <div class="upload-sub">Drop a {{ theme }} certificate scan and CertiGuard will run ELA on it.</div>
+                        <div class="upload-meta">
+                            <span>JPG</span>
+                            <span>PNG</span>
+                            <span>WEBP</span>
+                            <span>BMP</span>
+                            <span>5MB</span>
+                        </div>
+                        <input type="file" id="file-input" name="certificate" accept="image/*" required>
+                    </div>
+
+                    <div class="preview" id="preview">
+                        <button type="button" class="remove" id="remove-btn" aria-label="Remove document">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                        <img id="preview-img" alt="Document preview">
+                        <div class="preview-meta">
+                            <span class="name" id="preview-name">document.jpg</span>
+                            <span id="preview-size">0 KB</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="run-btn {{ theme }}" id="run-btn" disabled data-magnetic>
+                        <span>Run integrity verification</span>
+                        <span class="arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                <polyline points="12 5 19 12 12 19"/>
+                            </svg>
+                        </span>
+                    </button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner-ring {{ 'alt' if theme == 'medical' }}">
+                        <span class="core">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8M9 21h.1M3 12h.1M12 3v.1M21 12h-.1M15 4.6l-.1.1M4.6 9l.1.1"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <h3>Analyzing forensic integrity</h3>
+                    <p>Recompressing at quality 90, computing Error Level Analysis, and invoking the {{ theme }} classifier.</p>
+                    <div class="steps">
+                        <div class="step active {{ 'alt' if theme == 'medical' }}"></div>
+                        <div class="step active {{ 'alt' if theme == 'medical' }}"></div>
+                        <div class="step active {{ 'alt' if theme == 'medical' }}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if result %}
+        <div class="panel is-{{ accent_class }} reveal" data-stagger="3" style="margin-top: 20px;" data-tilt>
+            <div class="panel-core">
+                <div class="panel-section-head">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    <span>Forensic overlay</span>
+                    <span class="line"></span>
+                </div>
+                <div class="compare" id="compare">
+                    <div class="layer original" style="background-image: url('{{ result.original_image_url }}');"></div>
+                    <div class="layer ela"      style="background-image: url('{{ result.ela_image_url }}');"></div>
+                    <span class="label left">Original</span>
+                    <span class="label right">ELA</span>
+                    <div class="handle" id="handle" data-wobble></div>
+                </div>
+                <a href="/validate/{{ cert_type }}" class="reset-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    Analyze another document
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="right-pane">
+        {% if result %}
+            {% set is_real = result.label == 'Real Certificate' %}
+            <div class="panel reveal is-{{ 'emerald' if is_real else 'rose' }}" data-stagger="3" data-tilt>
+                <div class="panel-core">
+                    <div class="verdict-card {{ 'real' if is_real else 'fake' }}">
+                        <div class="verdict-mark">
+                            {% if is_real %}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 6 9 17l-5-5"/>
+                            </svg>
+                            {% else %}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="verdict-eyebrow">Forensic verdict</div>
+                        <div class="verdict-title" data-label="{{ result.label }}">
+                            {% if is_real %}Authentic document{% else %}Suspicious document{% endif %}
+                        </div>
+                        <div class="verdict-sub">
+                            {% if is_real %}
+                            Compression patterns look uniform &mdash; no obvious tampering cues.
+                            {% else %}
+                            Compression anomalies detected. Regions may have been altered.
+                            {% endif %}
+                        </div>
+                        <div class="verdict-tech">
+                            <span class="verdict-tech-label">Raw verdict</span>
+                            <code>{{ result.label }}</code>
+                        </div>
+
+                        <svg width="0" height="0" style="position:absolute;">
+                            <defs>
+                                <linearGradient id="gauge-emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#34d399"/>
+                                    <stop offset="100%" stop-color="#059669"/>
+                                </linearGradient>
+                                <linearGradient id="gauge-rose" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#fb7185"/>
+                                    <stop offset="100%" stop-color="#be123c"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+
+                        <div class="gauge">
+                            <svg viewBox="0 0 100 100">
+                                <circle class="ring-bg" cx="50" cy="50" r="42"/>
+                                <circle class="ring-fg {{ 'real' if is_real else 'fake' }}" cx="50" cy="50" r="42"
+                                        stroke-dasharray="263.89" stroke-dashoffset="263.89"
+                                        data-target="{{ ((result.confidence if is_real else result.fake_probability) * 100)|round(2) }}"/>
+                            </svg>
+                            <div class="value">
+                                <div class="pct"><span data-counter data-count="{{ ((result.confidence if is_real else result.fake_probability) * 100)|round(2) }}" data-decimals="2" data-suffix="%" data-duration="1400">{{ "%.2f"|format((result.confidence if is_real else result.fake_probability) * 100) }}%</span></div>
+                                <div class="lbl">{% if is_real %}Authenticity{% else %}Tamper risk{% endif %}</div>
+                            </div>
+                        </div>
+
+                        <div class="score-bars">
+                            <div class="score-row conf">
+                                <div class="head">
+                                    <span>Authenticity confidence</span>
+                                    <span class="v">{{ "%.2f"|format(result.confidence * 100) }}%</span>
+                                </div>
+                                <div class="bar" data-sweep><div class="fill" style="width: {{ (result.confidence * 100)|round(2) }}%;"></div></div>
+                            </div>
+                            <div class="score-row fake">
+                                <div class="head">
+                                    <span>Fake probability</span>
+                                    <span class="v">{{ "%.2f"|format(result.fake_probability * 100) }}%</span>
+                                </div>
+                                <div class="bar" data-sweep><div class="fill" style="width: {{ (result.fake_probability * 100)|round(2) }}%;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section-head" style="margin-top: 28px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+                        <span>Indicator checklist</span>
+                        <span class="line"></span>
+                    </div>
+                    <div class="indicators">
+                        <div class="indicator">
+                            <div class="left">
+                                <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+                                <span>Source format</span>
+                            </div>
+                            <span class="pill ok"><span class="dot"></span>Verified</span>
+                        </div>
+                        <div class="indicator">
+                            <div class="left">
+                                <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span>
+                                <span>Error Level Analysis</span>
+                            </div>
+                            <span class="pill ok"><span class="dot"></span>Analyzed</span>
+                        </div>
+                        <div class="indicator">
+                            <div class="left">
+                                <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 0 1 0 18M3 12h18"/></svg></span>
+                                <span>{{ theme|capitalize }} classifier</span>
+                            </div>
+                            <span class="pill ok"><span class="dot"></span>Completed</span>
+                        </div>
+                        <div class="indicator">
+                            <div class="left">
+                                <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 9 9 9 9 0 0 1-9 9 9 9 0 0 1-9-9z"/><path d="M3 12h18"/></svg></span>
+                                <span>Compression uniformity</span>
+                            </div>
+                            <span class="pill {{ 'ok' if is_real else 'alert' }}"><span class="dot"></span>{{ 'Uniform' if is_real else 'Disparity' }}</span>
+                        </div>
+                        <div class="indicator">
+                            <div class="left">
+                                <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg></span>
+                                <span>Layout matrix</span>
+                            </div>
+                            <span class="pill {{ 'ok' if is_real else 'alert' }}"><span class="dot"></span>{{ 'Consistent' if is_real else 'Irregular' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="panel reveal" data-stagger="3">
+                <div class="panel-core" style="padding: 36px 32px;">
+                    <div class="panel-section-head">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/><path d="m9 12 2 2 4-4"/></svg>
+                        <span>Pipeline overview</span>
+                        <span class="line"></span>
+                    </div>
+                    <ol style="list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 14px;">
+                        <li style="counter-increment: step; display: flex; gap: 14px; align-items: flex-start;">
+                            <span style="width: 26px; height: 26px; border-radius: 8px; background: var(--ink-06); color: var(--ink-60); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; font-family: var(--font-mono);">01</span>
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 600; color: var(--ink-100); margin-bottom: 3px;">Ingest the document</div>
+                                <div style="font-size: 12.5px; color: var(--ink-40); line-height: 1.55;">Drop a high-resolution scan. The file never touches disk after the session ends.</div>
+                            </div>
+                        </li>
+                        <li style="counter-increment: step; display: flex; gap: 14px; align-items: flex-start;">
+                            <span style="width: 26px; height: 26px; border-radius: 8px; background: var(--ink-06); color: var(--ink-60); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; font-family: var(--font-mono);">02</span>
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 600; color: var(--ink-100); margin-bottom: 3px;">Run Error Level Analysis</div>
+                                <div style="font-size: 12.5px; color: var(--ink-40); line-height: 1.55;">Recompress at quality 90, diff the layers, and amplify edited regions.</div>
+                            </div>
+                        </li>
+                        <li style="counter-increment: step; display: flex; gap: 14px; align-items: flex-start;">
+                            <span style="width: 26px; height: 26px; border-radius: 8px; background: var(--ink-06); color: var(--ink-60); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; font-family: var(--font-mono);">03</span>
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 600; color: var(--ink-100); margin-bottom: 3px;">Invoke the {{ theme }} classifier</div>
+                                <div style="font-size: 12.5px; color: var(--ink-40); line-height: 1.55;">Domain-specialized EfficientNetB0 produces a fake probability and confidence score.</div>
+                            </div>
+                        </li>
+                        <li style="counter-increment: step; display: flex; gap: 14px; align-items: flex-start;">
+                            <span style="width: 26px; height: 26px; border-radius: 8px; background: var(--ink-06); color: var(--ink-60); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; font-family: var(--font-mono);">04</span>
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 600; color: var(--ink-100); margin-bottom: 3px;">Render the verdict</div>
+                                <div style="font-size: 12.5px; color: var(--ink-40); line-height: 1.55;">A side-by-side ELA overlay appears next to a confidence gauge and indicator checklist.</div>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        var dropZone = document.getElementById('drop-zone');
+        var fileInput = document.getElementById('file-input');
+        var preview = document.getElementById('preview');
+        var previewImg = document.getElementById('preview-img');
+        var previewName = document.getElementById('preview-name');
+        var previewSize = document.getElementById('preview-size');
+        var removeBtn = document.getElementById('remove-btn');
+        var runBtn = document.getElementById('run-btn');
+        var form = document.getElementById('upload-form');
+        var loading = document.getElementById('loading');
+        var compare = document.getElementById('compare');
+
+        function fmtBytes(n) {
+            if (n < 1024) return n + ' B';
+            if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+            return (n / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        ['dragenter', 'dragover'].forEach(function(evt) {
+            dropZone.addEventListener(evt, function(e) {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function(evt) {
+            dropZone.addEventListener(evt, function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            var files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) {
+                fileInput.files = files;
+                handleFile(files[0]);
+            }
+        });
+        fileInput.addEventListener('change', function() {
+            if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+        });
+
+        dropZone.addEventListener('click', function(e) {
+            if (e.target === fileInput) return;
+            e.preventDefault();
+            fileInput.click();
+        });
+        dropZone.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+        dropZone.setAttribute('tabindex', '0');
+        dropZone.setAttribute('role', 'button');
+        dropZone.setAttribute('aria-label', 'Choose a certificate image to analyze');
+
+        function handleFile(file) {
+            if (!file.type || file.type.indexOf('image/') !== 0) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                previewName.textContent = file.name;
+                previewSize.textContent = fmtBytes(file.size);
+                preview.style.display = 'block';
+                dropZone.style.display = 'none';
+                runBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            previewImg.src = '';
+            preview.style.display = 'none';
+            dropZone.style.display = 'block';
+            runBtn.disabled = true;
+        });
+
+        form.addEventListener('submit', function() {
+            dropZone.style.display = 'none';
+            preview.style.display = 'none';
+            runBtn.style.display = 'none';
+            loading.style.display = 'block';
+        });
+
+        // Animate gauge
+        var fg = document.querySelector('.gauge .ring-fg');
+        if (fg) {
+            var target = parseFloat(fg.getAttribute('data-target') || '0');
+            var circumference = 2 * Math.PI * 42; // 263.89
+            var offset = circumference - (target / 100) * circumference;
+            requestAnimationFrame(function() {
+                setTimeout(function() { fg.style.strokeDashoffset = offset; }, 200);
+            });
+        }
+
+        // Compare slider
+        if (compare) {
+            var handle = document.getElementById('handle');
+            var elaLayer = compare.querySelector('.layer.ela');
+            var dragging = false;
+
+            function setPosition(percent) {
+                percent = Math.max(0, Math.min(100, percent));
+                handle.style.left = percent + '%';
+                elaLayer.style.clipPath = 'inset(0 0 0 ' + percent + '%)';
+            }
+            setPosition(50);
+
+            function getX(e) {
+                var rect = compare.getBoundingClientRect();
+                var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                return (x / rect.width) * 100;
+            }
+            function start(e) { dragging = true; setPosition(getX(e)); e.preventDefault(); }
+            function move(e)  { if (!dragging) return; setPosition(getX(e)); e.preventDefault(); }
+            function end()    { dragging = false; }
+
+            handle.addEventListener('mousedown', start);
+            handle.addEventListener('touchstart', start, { passive: false });
+            compare.addEventListener('mousedown', start);
+            compare.addEventListener('touchstart', start, { passive: false });
+            window.addEventListener('mousemove', move);
+            window.addEventListener('touchmove', move, { passive: false });
+            window.addEventListener('mouseup', end);
+            window.addEventListener('touchend', end);
+        }
+    })();
+</script>
+{% endblock %}

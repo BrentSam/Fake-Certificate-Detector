@@ -19,8 +19,8 @@ class SyntheticDatasetTests(unittest.TestCase):
 
             self.assertEqual(summary["real"], 3)
             self.assertEqual(summary["fake"], 3)
-            self.assertEqual(len(list((output / "real").glob("synthetic_real_*.jpg"))), 3)
-            self.assertEqual(len(list((output / "fake").glob("synthetic_fake_*.jpg"))), 3)
+            self.assertEqual(len(list((output / "real").glob("internship_real_*.jpg"))), 3)
+            self.assertEqual(len(list((output / "fake").glob("internship_fake_*.jpg"))), 3)
             self.assertTrue(log_path.exists())
 
             with log_path.open(newline="", encoding="utf-8") as log_file:
